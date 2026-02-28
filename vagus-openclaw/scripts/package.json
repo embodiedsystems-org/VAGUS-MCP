@@ -1,0 +1,13 @@
+{
+  "name": "vagus-openclaw-client",
+  "version": "1.0.0",
+  "description": "VAGUS MCP client for OpenClaw",
+  "private": true,
+  "main": "vagus-connect.js",
+  "bin": {
+    "vagus-connect": "./vagus-connect.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

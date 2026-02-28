@@ -1,0 +1,388 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VAGUS Docs - Server (Android App)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body data-section="server">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <div class="page-wrap">
+
+    <header class="site-header">
+      <div class="brand">
+        <p class="eyebrow">Developer Documentation</p>
+        <h1>VAGUS</h1>
+      </div>
+      <p class="subtitle">Android app MCP server reference.</p>
+    </header>
+
+    <nav class="top-nav" aria-label="Main sections">
+      <a class="nav-link" data-section-link="openclaw-deployment" href="./client.html">Openclaw Deployment</a>
+      <a class="nav-link" data-section-link="node-client" href="./node-client.html">Node Client</a>
+      <a class="nav-link" data-section-link="server" href="./server.html">Server (Android App)</a>
+      <a class="nav-link" data-section-link="relay" href="./relay.html">Self-Hosted Relay</a>
+      <a class="nav-link" data-section-link="roadmap" href="./roadmap.html">Roadmap</a>
+    </nav>
+
+    <main class="layout">
+      <aside class="side-nav" aria-label="Server page sections">
+        <p class="side-nav-title">On This Page</p>
+        <a href="#overview">Overview</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#lifecycle">Runtime Lifecycle</a>
+        <a href="#transport">Pairing and Transport</a>
+        <a href="#mcp-surface">MCP Surface</a>
+        <a href="#resources">Resources</a>
+        <a href="#tools">Tools</a>
+        <a href="#governance">Governance and Policy</a>
+        <a href="#subscriptions">Subscriptions and Replay</a>
+        <a href="#access-modes">Subscriptions vs Read-Only</a>
+        <a href="#io">Onboard I/O Sensors</a>
+        <a href="#observability">Observability and Logs</a>
+        <a href="#security">Security and Privacy</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+      </aside>
+
+      <div class="content">
+        <section id="overview" class="card">
+          <h2>Overview</h2>
+          <p>
+            The VAGUS Android app embeds an MCP server and exposes device capabilities as MCP resources and tools.
+            It runs as a foreground service, connects to the relay over WebSocket, enforces user/governance policy,
+            and streams capability updates to the connected agent.
+          </p>
+          <div class="callout">
+            <p>
+              Current product behavior is single-agent in UX, but core session/subscription handling already tracks
+              session IDs and is structured for future multi-agent expansion.
+            </p>
+            <p>Related docs: <a href="./node-client.html">Node Client</a> for CLI/MCP invocation patterns and <a href="./relay.html">Self-Hosted Relay</a> for deployment and transport operations.</p>
+          </div>
+        </section>
+
+        <section id="architecture" class="card">
+          <h2>Architecture</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Primary Types</th>
+                <th>Responsibility</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>UI + Service</td>
+                <td><code>MainActivity</code>, <code>VagusForegroundService</code></td>
+                <td>Operator controls, pairing UX, policy toggles, status/log visibility.</td>
+              </tr>
+              <tr>
+                <td>MCP Server</td>
+                <td><code>McpServer</code>, <code>McpCodec</code>, registries</td>
+                <td>JSON-RPC/MCP routing, method dispatch, resource/tool advertisement, notifications.</td>
+              </tr>
+              <tr>
+                <td>Governance</td>
+                <td><code>GovernanceEngine</code>, <code>ActionPolicyStore</code></td>
+                <td>Permission gates, policy checks, rate/time windows, denial handling, audit events.</td>
+              </tr>
+              <tr>
+                <td>Capability Modules</td>
+                <td><code>modules/*</code></td>
+                <td>Implement concrete resources/tools backed by Android APIs.</td>
+              </tr>
+              <tr>
+                <td>Subscriptions</td>
+                <td><code>SubscriptionManager</code>, replay buffer/snapshot</td>
+                <td>Track active subscriptions, manage module lifecycles, replay reconnect gaps.</td>
+              </tr>
+              <tr>
+                <td>Audit Logs</td>
+                <td><code>AccessLogStore</code>, Room DB</td>
+                <td>Persist structured log entries, query/filter/export, retention pruning.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="lifecycle" class="card">
+          <h2>Runtime Lifecycle</h2>
+          <ol>
+            <li>App/service starts and initializes app graph modules.</li>
+            <li>MCP server starts and prepares subscription manager context.</li>
+            <li>Pairing/session token is created or resumed.</li>
+            <li>Relay transport opens and server creates current transport session ID.</li>
+            <li>Client sends <code>initialize</code> then <code>initialized</code>.</li>
+            <li>Server advertises current tools/resources and begins normal request/subscribe handling.</li>
+            <li>On disconnect, subscriptions are cleaned up per session and reconnect logic applies.</li>
+          </ol>
+        </section>
+
+        <section id="transport" class="card">
+          <h2>Pairing and Transport</h2>
+          <h3>Pairing</h3>
+          <ul class="dense">
+            <li>6-digit pairing code is generated and reserved through relay APIs.</li>
+            <li>Session token is persisted and used to build relay connect URL.</li>
+            <li>Session completion and agent display name are persisted.</li>
+          </ul>
+          <h3>Transport and Reconnect</h3>
+          <ul class="dense">
+            <li>WebSocket transport uses heartbeat ping notifications.</li>
+            <li>Reconnect uses exponential backoff with generation guards.</li>
+            <li>A reconnect marker notification (<code>session/reconnect</code>) is sent after successful reconnects.</li>
+            <li>Replay window is used to re-push recent subscription updates after reconnect.</li>
+          </ul>
+        </section>
+
+        <section id="mcp-surface" class="card">
+          <h2>MCP Surface (Server Methods and Notifications)</h2>
+          <h3>Handled Methods</h3>
+          <ul class="dense">
+            <li><code>initialize</code></li>
+            <li><code>initialized</code> / <code>notifications/initialized</code></li>
+            <li><code>tools/list</code></li>
+            <li><code>tools/call</code></li>
+            <li><code>resources/list</code></li>
+            <li><code>resources/read</code></li>
+            <li><code>resources/subscribe</code></li>
+            <li><code>resources/unsubscribe</code></li>
+            <li><code>relay/client_connected</code> / <code>relay/client_disconnected</code></li>
+            <li><code>ping</code></li>
+          </ul>
+          <h3>Outbound Notifications</h3>
+          <ul class="dense">
+            <li><code>notifications/resources/updated</code></li>
+            <li><code>notifications/resources/list_changed</code></li>
+            <li><code>notifications/tools/list_changed</code></li>
+            <li><code>session/reconnect</code></li>
+          </ul>
+          <h3>Trace IDs</h3>
+          <p>
+            Outbound responses and notifications include <code>trace_id</code> when available. Request-derived trace IDs
+            are propagated across read/call/subscribe handling and appear in both protocol messages and audit logs.
+          </p>
+        </section>
+
+        <section id="resources" class="card">
+          <h2>Current Resources</h2>
+          <table class="col2-nowrap">
+            <thead>
+              <tr>
+                <th>Resource</th>
+                <th>Module</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>vagus://session/info</code></td><td>SessionInfoModule</td><td>Pairing/session metadata and agent name state.</td></tr>
+              <tr><td><code>vagus://sensors/motion</code></td><td>MockMotionModule</td><td>Motion context stream.</td></tr>
+              <tr><td><code>vagus://sensors/activity</code></td><td>ActivityRecognitionModule</td><td>Physical activity recognition.</td></tr>
+              <tr><td><code>vagus://sensors/activity_recognition</code></td><td>ActivityRecognitionModule</td><td>Alias resource for activity data.</td></tr>
+              <tr><td><code>vagus://sensors/location</code></td><td>LocationModule</td><td>Location context.</td></tr>
+              <tr><td><code>vagus://sensors/environment</code></td><td>EnvironmentModule</td><td>Ambient/device environment context.</td></tr>
+              <tr><td><code>vagus://inference/attention</code></td><td>EnvironmentModule</td><td>Attention inference stream.</td></tr>
+              <tr><td><code>vagus://inference/indoor_confidence</code></td><td>EnvironmentModule</td><td>Indoor confidence inference.</td></tr>
+              <tr><td><code>vagus://inference/sleep_likelihood</code></td><td>EnvironmentModule</td><td>Sleep likelihood inference.</td></tr>
+              <tr><td><code>vagus://inference/notification_timing</code></td><td>EnvironmentModule</td><td>Notification timing inference.</td></tr>
+              <tr><td><code>vagus://device/connectivity</code></td><td>ConnectivityModule</td><td>Network state and connectivity context.</td></tr>
+              <tr><td><code>vagus://device/screen</code></td><td>ScreenStateModule</td><td>Screen and lock state context.</td></tr>
+              <tr><td><code>vagus://device/battery</code></td><td>BatteryModule</td><td>Battery level/charging state.</td></tr>
+              <tr><td><code>vagus://device/notifications</code></td><td>NotificationsReadModule</td><td>Recent observed notification events.</td></tr>
+              <tr><td><code>vagus://device/clipboard</code></td><td>ClipboardModule</td><td>Current clipboard text context.</td></tr>
+              <tr><td><code>vagus://io/type_*</code></td><td>IoSensorsModule</td><td>Dynamic per-sensor onboard I/O resources.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="tools" class="card">
+          <h2>Current Tools</h2>
+          <table class="col2-nowrap">
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Module</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>notify</code></td><td>NotifyToolModule</td><td>Posts Android notifications. Required: <code>title</code>, <code>body</code>; max lengths 200/1000. Gated by <code>perm_notify</code> and Android notification permission on API 33+.</td></tr>
+              <tr><td><code>clipboard/set</code></td><td>ClipboardModule</td><td>Writes text to clipboard. Required: <code>content</code> (max 10000 chars). Gated by <code>perm_clipboard</code>.</td></tr>
+              <tr><td><code>haptic/pulse</code></td><td>HapticsModule</td><td>Single haptic pulse. Optional: <code>durationMs</code> (10-5000; defaults to 120). Gated by <code>perm_haptics</code> and Android <code>VIBRATE</code> permission.</td></tr>
+              <tr><td><code>haptic/pattern</code></td><td>HapticsModule</td><td>Pattern-based vibration. Optional: <code>pattern</code> (non-negative integer array). Gated by <code>perm_haptics</code> and Android <code>VIBRATE</code> permission.</td></tr>
+              <tr><td><code>speak</code></td><td>TtsModule</td><td>Text-to-speech output. Required: <code>text</code> (max 5000). Optional: <code>language</code>, <code>rate</code> (0.25-2.0), <code>pitch</code> (0.5-2.0), <code>voice</code>/<code>voice_id</code>, <code>interrupt</code>. Gated by <code>perm_tts</code>.</td></tr>
+              <tr><td><code>sms/send</code></td><td>ActionToolsModule</td><td>Send SMS. Required: <code>to</code>, <code>body</code> (max 2000). Gated by <code>perm_sms_send</code> + Android <code>SEND_SMS</code>; additionally constrained by SMS policy (allowlist/body length/rate/time/consent).</td></tr>
+              <tr><td><code>intent/open_url</code></td><td>ActionToolsModule</td><td>Open URL in browser. Required: <code>url</code> with <code>http</code>/<code>https</code>; policy may enforce HTTPS-only. Gated by <code>perm_open_url</code> and Open URL policy (rate/time/consent).</td></tr>
+              <tr><td><code>calendar/create_event</code></td><td>ActionToolsModule</td><td>Create calendar event. Required: <code>title</code>; optional <code>startTimeMs</code>, <code>endTimeMs</code>, <code>location</code>, <code>description</code>, <code>allDay</code>. Gated by <code>perm_calendar_create</code> + Android calendar permissions and calendar policy (future start/duration/rate/time/consent).</td></tr>
+              <tr><td><code>io/set_subscription_resolution</code></td><td>ActionToolsModule</td><td>Set cadence for all <code>vagus://io/type_*</code> subscriptions using <code>resolutionMs</code> (allowed: 1500, 10000, 30000, 60000, 90000, 120000, 300000). Gated by <code>perm_agent_set_io_resolution</code> (default off).</td></tr>
+              <tr><td><code>infer/set_subscription_resolution</code></td><td>ActionToolsModule</td><td>Set cadence for infer subscriptions using <code>resolutionMs</code> (allowed: 1500, 10000, 30000, 60000, 90000, 120000, 300000). Gated by <code>perm_agent_set_infer_resolution</code> (default off).</td></tr>
+              <tr><td><code>agent/set_name</code></td><td>SessionInfoModule</td><td>Set persistent agent display name. Required: <code>name</code> (max 64); empty string clears the saved name. Gated by <code>perm_session</code>.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="governance" class="card">
+          <h2>Governance and Policy</h2>
+          <p>
+            Every resource read/subscribe and tool call passes through governance checks before execution.
+          </p>
+          <h3>Controls</h3>
+          <ul class="dense">
+            <li>Android permission gate (where applicable).</li>
+            <li>Per-capability and per-sensor user toggles.</li>
+            <li>Agent control for I/O cadence is gated by <code>perm_agent_set_io_resolution</code> (default off).</li>
+            <li>Agent control for infer cadence is gated by <code>perm_agent_set_infer_resolution</code> (default off).</li>
+            <li>Policy windows (active hours), rate limits, and input constraints.</li>
+            <li>Optional ask/deny one-time approval for selected tools.</li>
+          </ul>
+          <h3>I/O Master</h3>
+          <p>
+            <code>perm_io</code> is the master override for onboard sensor resources and is combined with per-sensor
+            toggles (<code>perm_io_sensor_*</code>).
+          </p>
+        </section>
+
+        <section id="subscriptions" class="card">
+          <h2>Subscriptions and Replay</h2>
+          <ul class="dense">
+            <li>Subscriptions are tracked by <code>(sessionId, resourceId)</code>.</li>
+            <li>Module lifecycles are managed automatically based on active subscription counts/dependencies.</li>
+            <li>Reconnect gap handling uses event ring buffer + snapshot replay.</li>
+            <li>Agent page includes active subscription management UI with per-row cancel and cancel all.</li>
+          </ul>
+        </section>
+
+        <section id="access-modes" class="card">
+          <h2>Subscriptions vs Read-Only</h2>
+          <p>
+            Not all resources support streaming subscriptions. Use this as the server-side source of truth for
+            <code>resources/subscribe</code> behavior.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Resource</th>
+                <th>Read</th>
+                <th>Subscribe</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>vagus://session/info</code></td><td>Yes</td><td>Yes</td><td>Snapshot + stream of session/app status updates.</td></tr>
+              <tr><td><code>vagus://sensors/motion</code></td><td>Yes</td><td>Yes</td><td>High-frequency stream for motion context.</td></tr>
+              <tr><td><code>vagus://sensors/location</code></td><td>Yes</td><td>Yes</td><td>Event-driven location updates from platform location callbacks.</td></tr>
+              <tr><td><code>vagus://device/clipboard</code></td><td>Yes</td><td>No</td><td>Read-only snapshot resource. Subscribe is rejected.</td></tr>
+              <tr><td><code>vagus://device/screen</code></td><td>Yes</td><td>Yes</td><td>Event-driven subscription (screen on/off/user present).</td></tr>
+              <tr><td><code>vagus://device/notifications</code></td><td>Yes</td><td>Yes</td><td>Event-driven subscription (posted/removed notification events).</td></tr>
+              <tr><td><code>vagus://device/battery</code></td><td>Yes</td><td>Yes</td><td>Low-frequency poll (~5 minutes).</td></tr>
+              <tr><td><code>vagus://device/connectivity</code></td><td>Yes</td><td>Yes</td><td>Event-driven subscription (network callback).</td></tr>
+              <tr><td><code>vagus://sensors/activity</code>, <code>vagus://sensors/activity_recognition</code></td><td>Yes</td><td>Yes</td><td>Cadence controlled by Infer subscription resolution setting.</td></tr>
+              <tr><td><code>vagus://sensors/environment</code>, <code>vagus://inference/*</code></td><td>Yes</td><td>Yes</td><td>Cadence controlled by Infer subscription resolution setting.</td></tr>
+              <tr><td><code>vagus://io/type_*</code></td><td>Yes</td><td>Yes</td><td>Cadence controlled by I/O subscription resolution setting.</td></tr>
+            </tbody>
+          </table>
+          <p class="note">
+            Subscription capability may still be denied at runtime by governance toggles, Android permissions, or policy.
+          </p>
+        </section>
+
+        <section id="io" class="card">
+          <h2>Onboard I/O Sensors</h2>
+          <p>
+            The I/O page discovers hardware sensors at runtime and exposes each sensor as a dedicated MCP resource.
+          </p>
+          <ul class="dense">
+            <li>Sensors grouped by UI tabs: Motion &amp; Pose, Environment, Location &amp; Heading, Other, Uncalibrated.</li>
+            <li>Per-sensor toggle state and live readout are shown in app UI.</li>
+            <li>Uncalibrated/raw feeds are treated as advanced and disabled by default.</li>
+            <li>Vendor-specific sensor types are supported through dynamic resource IDs.</li>
+          </ul>
+        </section>
+
+        <section id="observability" class="card">
+          <h2>Observability and Logs</h2>
+          <h3>Structured Log Model</h3>
+          <ul class="dense">
+            <li>Severity: <code>INFO</code>, <code>WARN</code>, <code>ERROR</code>, <code>SECURITY</code>.</li>
+            <li>Category: Resource, Subscription, Tool, Policy, System.</li>
+            <li>Context fields include <code>agentName</code>, <code>sessionId</code>, and <code>traceId</code>.</li>
+          </ul>
+          <h3>Storage and Retention</h3>
+          <ul class="dense">
+            <li>Room-backed persistent log store.</li>
+            <li>Batched background-safe DB writes via queued flush pipeline.</li>
+            <li>Retention pruning: max rows and max age.</li>
+          </ul>
+          <h3>Query and Export</h3>
+          <ul class="dense">
+            <li>Internal query API supports time range, category/severity filters, search, and pagination.</li>
+            <li>Status page includes filter pills, search box, paging, and time-range chips.</li>
+            <li>Export current filtered view as JSON or CSV from app UI.</li>
+          </ul>
+          <p class="note">
+            Query/export API is currently app-internal and is not exposed as MCP tool/resource yet.
+          </p>
+        </section>
+
+        <section id="security" class="card">
+          <h2>Security and Privacy</h2>
+          <ul class="dense">
+            <li>Least-privilege posture through explicit Android permission and feature toggle gates.</li>
+            <li>High-risk tools (SMS, URL opening, calendar writes) are policy constrained and auditable.</li>
+            <li>Denials and policy violations are logged as structured policy events.</li>
+            <li>Session cleanup unsubscribes active streams on disconnect/session close.</li>
+          </ul>
+        </section>
+
+        <section id="troubleshooting" class="card">
+          <h2>Troubleshooting</h2>
+          <h3>Common Issues</h3>
+          <table>
+            <thead>
+              <tr><th>Symptom</th><th>Likely Cause</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Method denied</td>
+                <td>Governance toggle/policy/permission block</td>
+                <td>Inspect Event Log policy/system filters, then review capability policy settings.</td>
+              </tr>
+              <tr>
+                <td>No resource updates</td>
+                <td>No active subscription or disconnected transport</td>
+                <td>Check active subscriptions card and transport status.</td>
+              </tr>
+              <tr>
+                <td>Missing capability in tools/resources list</td>
+                <td>Disabled toggle or missing Android permission</td>
+                <td>Enable toggle and grant runtime permission.</td>
+              </tr>
+              <tr>
+                <td>Reconnect loops</td>
+                <td>Relay/network instability</td>
+                <td>Review system lifecycle logs and relay URL configuration.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
+
+

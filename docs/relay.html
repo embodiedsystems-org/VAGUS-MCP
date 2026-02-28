@@ -1,0 +1,311 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VAGUS Docs - Self-Hosted Relay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body data-section="relay">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <div class="page-wrap">
+
+    <header class="site-header">
+      <div class="brand">
+        <p class="eyebrow">Developer Documentation</p>
+        <h1>VAGUS</h1>
+      </div>
+      <p class="subtitle">Self-hosted relay deployment and operations guide.</p>
+    </header>
+
+    <nav class="top-nav" aria-label="Main sections">
+      <a class="nav-link" data-section-link="openclaw-deployment" href="./client.html">Openclaw Deployment</a>
+      <a class="nav-link" data-section-link="node-client" href="./node-client.html">Node Client</a>
+      <a class="nav-link" data-section-link="server" href="./server.html">Server (Android App)</a>
+      <a class="nav-link" data-section-link="relay" href="./relay.html">Self-Hosted Relay</a>
+      <a class="nav-link" data-section-link="roadmap" href="./roadmap.html">Roadmap</a>
+    </nav>
+
+    <main class="layout">
+      <aside class="side-nav">
+        <p class="side-nav-title">Relay Deploy</p>
+        <a href="#relay-overview">Overview</a>
+        <a href="#relay-architecture">Architecture</a>
+        <a href="#relay-prereqs">Prerequisites</a>
+        <a href="#relay-install">Install Server</a>
+        <a href="#relay-config">Environment Config</a>
+        <a href="#relay-systemd">systemd Service</a>
+        <a href="#relay-nginx">Nginx + SSL</a>
+        <a href="#relay-verify">Verification</a>
+        <a href="#relay-ops">Operations</a>
+        <a href="#relay-troubleshooting">Troubleshooting</a>
+        <a href="#relay-security">Security Checklist</a>
+      </aside>
+
+      <section class="content">
+        <section id="relay-overview" class="card">
+          <h2>Overview</h2>
+          <p>
+            This guide documents production deployment of the VAGUS relay server from
+            <code>../relay-server</code> using:
+          </p>
+          <ul>
+            <li>Node.js runtime for the relay process.</li>
+            <li><code>systemd</code> for daemon lifecycle management.</li>
+            <li><code>nginx</code> as TLS terminator and reverse proxy.</li>
+            <li>Optional Redis persistence (recommended production mode).</li>
+          </ul>
+          <div class="callout">
+            <p><strong>Public URL:</strong> <code>wss://relay.example.com</code></p>
+            <p><strong>Health endpoint:</strong> <code>https://relay.example.com/health</code></p>
+            <p><strong>Code source:</strong> <code>../relay-server/src/server.js</code></p>
+            <p><strong>Note:</strong> domain, paths, and port values in this guide are examples; replace with your environment.</p>
+            <p><strong>Related:</strong> <a href="./server.html">Server (Android App)</a> for MCP runtime behavior and <a href="./node-client.html">Node Client</a> for client-side CLI usage.</p>
+          </div>
+        </section>
+
+        <section id="relay-architecture" class="card">
+          <h2>Architecture</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Role</th>
+                <th>Port</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>nginx</td><td>TLS termination, HTTP/WebSocket proxy, public ingress.</td><td>443</td></tr>
+              <tr><td>Relay Node process</td><td>Pairing API + WSS routing + session logic.</td><td>18087 (loopback)</td></tr>
+              <tr><td>Redis (optional)</td><td>Session/pair persistence across relay restarts.</td><td>6379</td></tr>
+            </tbody>
+          </table>
+          <p>Endpoints served by relay:</p>
+          <ul class="dense">
+            <li><code>POST /pair</code></li>
+            <li><code>POST /revoke</code></li>
+            <li><code>GET /health</code></li>
+            <li><code>WSS /connect/&lt;session_token&gt;?role=app|client</code></li>
+          </ul>
+        </section>
+
+        <section id="relay-prereqs" class="card">
+          <h2>Prerequisites</h2>
+          <ul>
+            <li>Ubuntu/Debian VPS with sudo access.</li>
+            <li>Domain DNS <code>relay.example.com</code> pointing to the VPS.</li>
+            <li>Node 20+ installed at <code>/usr/bin/node</code>.</li>
+            <li><code>nginx</code> and <code>systemd</code> installed.</li>
+            <li>Optional: Redis available locally for persistence.</li>
+          </ul>
+          <pre><code class="language-bash"># one-time packages
+sudo apt update
+sudo apt install -y nginx redis-server certbot python3-certbot-nginx</code></pre>
+        </section>
+
+        <section id="relay-install" class="card">
+          <h2>Install Relay Server</h2>
+          <h3>1. Provision target directory</h3>
+          <pre><code class="language-bash">sudo mkdir -p &lt;relay_root&gt;
+sudo chown -R $USER:$USER &lt;relay_root&gt;</code></pre>
+
+          <h3>2. Copy relay source</h3>
+          <pre><code class="language-bash"># from your repo host
+cp -R ../relay-server/. &lt;relay_root&gt;/</code></pre>
+
+          <h3>3. Install dependencies</h3>
+          <pre><code class="language-bash">cd &lt;relay_root&gt;
+npm install --omit=dev</code></pre>
+        </section>
+
+        <section id="relay-config" class="card">
+          <h2>Environment Configuration</h2>
+          <p>Use <code>.env.example</code> as baseline. Key production settings:</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Recommended Production Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>PORT</code></td><td><code>18087</code> (bind on localhost behind nginx)</td></tr>
+              <tr><td><code>TRUST_PROXY</code></td><td><code>true</code> (required behind nginx)</td></tr>
+              <tr><td><code>REQUIRE_REDIS</code></td><td><code>true</code></td></tr>
+              <tr><td><code>REDIS_URL</code></td><td><code>&lt;redis_url&gt;</code></td></tr>
+              <tr><td><code>REDIS_PREFIX</code></td><td><code>vagus:relay:</code> (or tenant-specific)</td></tr>
+              <tr><td><code>RELAY_BUILD</code></td><td>release identifier (example <code>2026.02.25</code>)</td></tr>
+              <tr><td><code>REQUIRE_ORIGIN</code></td><td><code>false</code> unless strict browser-only flows are required</td></tr>
+              <tr><td><code>MAX_MESSAGE_BYTES</code></td><td><code>1048576</code> (1MB default)</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Example env file</h3>
+          <pre><code class="language-bash">sudo tee &lt;env_file&gt; >/dev/null &lt;&lt;'EOF'
+NODE_ENV=production
+PORT=&lt;relay_bind_port&gt;
+TRUST_PROXY=true
+RELAY_BUILD=2026.02.25
+REQUIRE_REDIS=true
+REDIS_URL=&lt;redis_url&gt;
+REDIS_PREFIX=vagus:relay:
+REQUIRE_ORIGIN=false
+EOF</code></pre>
+        </section>
+
+        <section id="relay-systemd" class="card">
+          <h2>systemd Service (Daemon)</h2>
+          <p>
+            Service template is provided at
+            <code>../relay-server/deploy/systemd/vagus-relay.service</code>.
+          </p>
+          <h3>Install service</h3>
+          <pre><code class="language-bash">sudo cp &lt;relay_root&gt;/deploy/systemd/vagus-relay.service /etc/systemd/system/vagus-relay.service
+
+# recommended: use env file instead of inline Environment lines
+sudo sed -i 's|^# EnvironmentFile=&lt;env_file&gt;|EnvironmentFile=&lt;env_file&gt;|' /etc/systemd/system/vagus-relay.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable vagus-relay
+sudo systemctl restart vagus-relay
+sudo systemctl status vagus-relay --no-pager</code></pre>
+
+          <h3>Logs</h3>
+          <pre><code class="language-bash">journalctl -u vagus-relay -f</code></pre>
+        </section>
+
+        <section id="relay-nginx" class="card">
+          <h2>Nginx + SSL</h2>
+          <p>
+            Nginx template is provided at
+            <code>../relay-server/deploy/nginx/relay.example.com.conf</code>.
+          </p>
+
+          <h3>1. Install nginx site config</h3>
+          <pre><code class="language-bash">sudo cp &lt;relay_root&gt;/deploy/nginx/relay.example.com.conf &lt;nginx_sites_available&gt;/&lt;nginx_site_name&gt;.conf
+sudo ln -sf &lt;nginx_sites_available&gt;/&lt;nginx_site_name&gt;.conf &lt;nginx_sites_enabled&gt;/&lt;nginx_site_name&gt;.conf
+sudo nginx -t
+sudo systemctl reload nginx</code></pre>
+
+          <h3>2. Issue SSL certificate (Let's Encrypt)</h3>
+          <pre><code class="language-bash">sudo certbot --nginx -d relay.example.com
+sudo nginx -t
+sudo systemctl reload nginx</code></pre>
+
+          <h3>3. Firewall (if UFW is enabled)</h3>
+          <pre><code class="language-bash">sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw status</code></pre>
+
+          <p class="note">
+            Relay listens on <code>&lt;relay_bind_host&gt;:&lt;relay_bind_port&gt;</code>. Do not expose &lt;relay_bind_port&gt; publicly.
+          </p>
+        </section>
+
+        <section id="relay-verify" class="card">
+          <h2>Verification</h2>
+          <h3>Health endpoint</h3>
+          <pre><code class="language-bash">curl -sS https://relay.example.com/health | jq</code></pre>
+
+          <p>Expected fields include:</p>
+          <ul class="dense">
+            <li><code>status: "ok"</code></li>
+            <li><code>mode: "multi-client"</code></li>
+            <li><code>relay_build</code></li>
+            <li><code>persistence: "redis"</code> (if Redis configured)</li>
+          </ul>
+
+          <h3>Smoke test</h3>
+          <pre><code class="language-bash">cd &lt;relay_root&gt;
+node scripts/smoke-test.js</code></pre>
+        </section>
+
+        <section id="relay-ops" class="card">
+          <h2>Operations</h2>
+          <h3>Restart relay</h3>
+          <pre><code class="language-bash">sudo systemctl restart vagus-relay</code></pre>
+
+          <h3>Deploy update</h3>
+          <pre><code class="language-bash">cd &lt;relay_root&gt;
+# sync updated source here
+npm install --omit=dev
+sudo systemctl restart vagus-relay
+curl -sS https://relay.example.com/health</code></pre>
+
+          <h3>Zero-data guarantees</h3>
+          <ul>
+            <li>Payloads are relayed in memory and not persisted by relay.</li>
+            <li>Redis stores session metadata only (token/code/session state), not message bodies.</li>
+          </ul>
+        </section>
+
+        <section id="relay-troubleshooting" class="card">
+          <h2>Troubleshooting</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Symptom</th>
+                <th>Check</th>
+                <th>Fix</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>/health</code> returns 502</td>
+                <td><code>systemctl status vagus-relay</code></td>
+                <td>Start/restart service and inspect journal logs.</td>
+              </tr>
+              <tr>
+                <td>WSS handshake fails</td>
+                <td><code>nginx -t</code>, cert validity, DNS</td>
+                <td>Fix TLS config/cert and reload nginx.</td>
+              </tr>
+              <tr>
+                <td>Service exits on boot</td>
+                <td>journal logs for Redis error</td>
+                <td>Set <code>REDIS_URL</code> or disable <code>REQUIRE_REDIS</code> temporarily.</td>
+              </tr>
+              <tr>
+                <td>Pair requests rate limited</td>
+                <td>HTTP 429 on <code>/pair</code></td>
+                <td>Tune <code>MAX_PAIR_REQUESTS_PER_WINDOW</code> and <code>RATE_LIMIT_WINDOW_MS</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="relay-security" class="card">
+          <h2>Security Checklist</h2>
+          <ol>
+            <li>Run behind TLS only. Enforce HTTP-to-HTTPS redirect.</li>
+            <li>Keep relay port private (loopback), expose only 443/80 via nginx.</li>
+            <li>Use Redis persistence for restart safety and controlled session cleanup.</li>
+            <li>Set <code>TRUST_PROXY=true</code> when behind nginx for correct client IP rate limiting.</li>
+            <li>Set <code>RELAY_BUILD</code> per release for traceable health diagnostics.</li>
+            <li>Review <code>ORIGIN_ALLOWLIST</code>/<code>REQUIRE_ORIGIN</code> only if browser-origin restrictions are needed.</li>
+            <li>Monitor logs and alert on relay start failures, 5xx spikes, and pair abuse events.</li>
+          </ol>
+        </section>
+      </section>
+    </main>
+
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
+
+
+
+
+
+

@@ -1,0 +1,26 @@
+[Unit]
+Description=VAGUS WebSocket Relay
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=<relay_root>
+ExecStart=<node_bin> <relay_root>/src/server.js
+Restart=always
+RestartSec=2
+Environment=NODE_ENV=production
+Environment=PORT=<relay_bind_port>
+Environment=TRUST_PROXY=true
+Environment=REQUIRE_ORIGIN=false
+Environment=REQUIRE_REDIS=true
+# Environment=REDIS_URL=<redis_url>
+# Environment=REDIS_PREFIX=vagus:relay:
+
+# Uncomment and adjust if using env file:
+# EnvironmentFile=<env_file>
+
+User=<service_user>
+Group=<service_group>
+
+[Install]
+WantedBy=multi-user.target

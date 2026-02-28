@@ -1,0 +1,297 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VAGUS Docs - Node Client</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body data-section="node-client">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <div class="page-wrap">
+
+    <header class="site-header">
+      <div class="brand">
+        <p class="eyebrow">Developer Documentation</p>
+        <h1>VAGUS</h1>
+      </div>
+      <p class="subtitle">Raw Node CLI and MCP integration reference for custom agents.</p>
+    </header>
+
+    <nav class="top-nav" aria-label="Main sections">
+      <a class="nav-link" data-section-link="openclaw-deployment" href="./client.html">Openclaw Deployment</a>
+      <a class="nav-link" data-section-link="node-client" href="./node-client.html">Node Client</a>
+      <a class="nav-link" data-section-link="server" href="./server.html">Server (Android App)</a>
+      <a class="nav-link" data-section-link="relay" href="./relay.html">Self-Hosted Relay</a>
+      <a class="nav-link" data-section-link="roadmap" href="./roadmap.html">Roadmap</a>
+    </nav>
+
+    <main class="layout">
+      <aside class="side-nav">
+        <p class="side-nav-title">Node Client</p>
+        <a href="#node-overview">Overview</a>
+        <a href="#node-setup">Setup</a>
+        <a href="#node-cli">CLI Commands</a>
+        <a href="#node-jsonl">JSONL Contract</a>
+        <a href="#node-trace">Request Metadata</a>
+        <a href="#node-resources">Resources</a>
+        <a href="#node-access-modes">Subscriptions vs Read-Only</a>
+        <a href="#node-tools">Tools</a>
+        <a href="#node-permissions">Permissions</a>
+        <a href="#node-timeouts">Timeouts</a>
+        <a href="#node-errors">Errors</a>
+      </aside>
+
+      <section class="content">
+        <section id="node-overview" class="card">
+          <h2>Overview</h2>
+          <p>
+            The Node client is a CLI wrapper around MCP-over-WebSocket to VAGUS relay. It supports pair/connect,
+            read/call/list operations, and long-running subscriptions with JSONL output.
+          </p>
+          <div class="callout">
+            <p><strong>Entry:</strong> <code>scripts/vagus-connect.js</code></p>
+            <p><strong>Session file:</strong> <code>~/.openclaw/vagus-session.json</code></p>
+            <p><strong>Transport:</strong> <code>wss://relay.withvagus.com/connect/&lt;token&gt;</code></p>
+            <p><strong>Related:</strong> <a href="./server.html">Server (Android App)</a> for MCP surface and governance, <a href="./relay.html">Self-Hosted Relay</a> for infrastructure setup.</p>
+          </div>
+        </section>
+
+        <section id="node-setup" class="card">
+          <h2>Setup</h2>
+          <pre><code class="language-bash">cd ~/.openclaw/skills/vagus/scripts
+npm install
+node vagus-connect.js pair &lt;PAIR_CODE&gt;
+node vagus-connect.js status</code></pre>
+        </section>
+
+        <section id="node-cli" class="card">
+          <h2>CLI Commands</h2>
+          <pre><code class="language-bash">node {baseDir}/scripts/vagus-connect.js &lt;command&gt; [args]</code></pre>
+          <table>
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>Args</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>pair</code></td><td><code>&lt;code&gt;</code></td><td>Pair and persist session token.</td></tr>
+              <tr><td><code>connect</code></td><td>none</td><td>Connect using saved session.</td></tr>
+              <tr><td><code>status</code></td><td>none</td><td>Get connectivity and active modules.</td></tr>
+              <tr><td><code>read</code></td><td><code>&lt;uri&gt;</code></td><td>One-shot resource read.</td></tr>
+              <tr><td><code>subscribe</code></td><td><code>&lt;uri&gt;</code></td><td>Long-running stream of updates.</td></tr>
+              <tr><td><code>unsubscribe</code></td><td><code>&lt;uri&gt;</code></td><td>Stop a resource subscription.</td></tr>
+              <tr><td><code>call</code></td><td><code>&lt;tool&gt; '&lt;json&gt;'</code></td><td>Invoke a tool call.</td></tr>
+              <tr><td><code>list-resources</code></td><td>none</td><td>List available resource URIs.</td></tr>
+              <tr><td><code>list-tools</code></td><td>none</td><td>List available tools + schemas.</td></tr>
+              <tr><td><code>disconnect</code></td><td>none</td><td>Delete local session file.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="node-jsonl" class="card">
+          <h2>JSONL Contract</h2>
+          <p>All outputs are line-delimited JSON objects.</p>
+          <pre><code class="language-json">{"type":"paired","session_token":"..."}
+{"type":"capabilities","resources":["..."],"tools":["..."]}
+{"type":"resource","uri":"vagus://device/screen","data":{"screen_on":true,"locked":false}}
+{"type":"result","tool":"notify","success":true,"data":{"content":[{"type":"text","text":"{\"ok\":true}"}]}}</code></pre>
+        </section>
+
+        <section id="node-trace" class="card">
+          <h2>Request Metadata and Trace IDs</h2>
+          <p>
+            MCP response and notification envelopes include a top-level <code>trace_id</code> field when available. This identifier provides end-to-end correlation across request handling, outbound notifications, and server audit logs.
+          </p>
+          <pre><code class="language-json">{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "trace_id": "43818824:tools/call:5545a8fa214dd67e:405164970b59034e",
+  "result": {
+    "content": [ { "type": "text", "text": "{\"ok\":true,\"id\":9098}" } ],
+    "isError": false
+  }
+}</code></pre>
+          <pre><code class="language-json">{
+  "jsonrpc": "2.0",
+  "method": "notifications/resources/updated",
+  "trace_id": "43818824:resources/subscribe:5545a8fa214dd67e:aa3d70c94091b898",
+  "params": {
+    "sessionId": "5545a8fa214dd67e",
+    "uri": "vagus://device/screen",
+    "data": { "screen_on": true, "locked": false, "ts": 1772043993616 },
+    "ts": 1772043993632
+  }
+}</code></pre>
+          <p class="note">
+            The <code>vagus-connect.js</code> wrapper emits normalized JSONL and preserves MCP correlation context (including <code>trace_id</code>) in the <code>mcp</code> object for operational commands (read/call/list/subscribe/unsubscribe and streamed updates).
+            If you need the full raw JSON-RPC envelope, capture raw MCP frames in custom integrations.
+          </p>
+        </section>
+
+        <section id="node-resources" class="card">
+          <h2>Resources</h2>
+          <ul class="dense">
+            <li><code>vagus://session/info</code></li>
+            <li><code>vagus://sensors/motion</code>, <code>activity</code>, <code>activity_recognition</code>, <code>location</code>, <code>environment</code></li>
+            <li><code>vagus://inference/attention</code>, <code>indoor_confidence</code>, <code>sleep_likelihood</code>, <code>notification_timing</code></li>
+            <li><code>vagus://device/connectivity</code>, <code>screen</code>, <code>battery</code>, <code>clipboard</code>, <code>notifications</code></li>
+            <li><code>vagus://io/type_*</code> dynamic onboard sensor resources (device-specific)</li>
+          </ul>
+          <pre><code class="language-bash">node {baseDir}/scripts/vagus-connect.js read vagus://session/info
+node {baseDir}/scripts/vagus-connect.js subscribe vagus://device/screen</code></pre>
+        </section>
+
+        <section id="node-access-modes" class="card">
+          <h2>Subscriptions vs Read-Only</h2>
+          <p>
+            Before using <code>subscribe</code>, confirm the URI supports streaming semantics on the server.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>URI</th>
+                <th><code>read</code></th>
+                <th><code>subscribe</code></th>
+                <th>Node-Client Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>vagus://session/info</code></td><td>Supported</td><td>Supported</td><td>Use subscribe for ongoing runtime/session telemetry.</td></tr>
+              <tr><td><code>vagus://sensors/motion</code></td><td>Supported</td><td>Supported</td><td>High-frequency stream; subscribe for continuous updates.</td></tr>
+              <tr><td><code>vagus://sensors/location</code></td><td>Supported</td><td>Supported</td><td>Event-driven location updates during movement.</td></tr>
+              <tr><td><code>vagus://device/connectivity</code></td><td>Supported</td><td>Supported</td><td>Event-driven connectivity state changes.</td></tr>
+              <tr><td><code>vagus://device/clipboard</code></td><td>Supported</td><td>Not supported</td><td>Use <code>read</code> only; subscribe returns MCP invalid request.</td></tr>
+              <tr><td><code>vagus://device/screen</code></td><td>Supported</td><td>Supported</td><td>Event-driven updates when screen state changes.</td></tr>
+              <tr><td><code>vagus://device/notifications</code></td><td>Supported</td><td>Supported</td><td>Event-driven updates when notifications post/remove.</td></tr>
+              <tr><td><code>vagus://device/battery</code></td><td>Supported</td><td>Supported</td><td>Low-frequency updates (~5 minutes) in subscription mode.</td></tr>
+              <tr><td><code>vagus://sensors/activity</code>, <code>activity_recognition</code>, <code>environment</code>, <code>vagus://inference/*</code></td><td>Supported</td><td>Supported</td><td>Cadence controlled by Infer resolution in app UI.</td></tr>
+              <tr><td><code>vagus://io/type_*</code></td><td>Supported</td><td>Supported</td><td>Cadence controlled by I/O resolution in app UI.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="node-tools" class="card">
+          <h2>Tools</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Required Params</th>
+                <th>Constraints / Governance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>notify</code></td><td><code>title</code>, <code>body</code></td><td><code>title</code>/<code>body</code> max 200/1000; requires notifications capability enabled.</td></tr>
+              <tr><td><code>speak</code></td><td><code>text</code></td><td><code>text</code> max 5000; optional voice/language/rate/pitch/interrupt values validated server-side.</td></tr>
+              <tr><td><code>sms/send</code></td><td><code>to</code>, <code>body</code></td><td><code>body</code> max 2000; Android <code>SEND_SMS</code> and SMS governance policy must allow.</td></tr>
+              <tr><td><code>intent/open_url</code></td><td><code>url</code></td><td>URL must be <code>http</code>/<code>https</code>; policy may enforce HTTPS-only.</td></tr>
+              <tr><td><code>calendar/create_event</code></td><td><code>title</code></td><td>Optional start/end/location/description/allDay fields; calendar permissions and policy apply.</td></tr>
+              <tr><td><code>clipboard/set</code></td><td><code>content</code></td><td><code>content</code> max 10000; blocked when clipboard capability is disabled.</td></tr>
+              <tr><td><code>haptic/pulse</code></td><td>none</td><td>Optional <code>durationMs</code> (10-5000, default 120); requires haptics capability and Android vibrate permission.</td></tr>
+              <tr><td><code>haptic/pattern</code></td><td>none</td><td>Optional <code>pattern</code> integer array; requires haptics capability and Android vibrate permission.</td></tr>
+              <tr><td><code>agent/set_name</code></td><td><code>name</code></td><td>Max 64 chars; empty string clears the stored name.</td></tr>
+              <tr><td><code>io/set_subscription_resolution</code></td><td><code>resolutionMs</code></td><td>Allowed values: 1500, 10000, 30000, 60000, 90000, 120000, 300000; requires <code>Allow agent to set resolution</code>.</td></tr>
+              <tr><td><code>infer/set_subscription_resolution</code></td><td><code>resolutionMs</code></td><td>Allowed values: 1500, 10000, 30000, 60000, 90000, 120000, 300000; requires <code>Allow agent to set infer resolution</code>.</td></tr>
+            </tbody>
+          </table>
+          <pre><code class="language-bash">node {baseDir}/scripts/vagus-connect.js call sms/send '{"to":"+14388090319","body":"Test message"}'
+node {baseDir}/scripts/vagus-connect.js call intent/open_url '{"url":"https://withvagus.com"}'
+node {baseDir}/scripts/vagus-connect.js call io/set_subscription_resolution '{"resolutionMs":30000}'
+node {baseDir}/scripts/vagus-connect.js call infer/set_subscription_resolution '{"resolutionMs":30000}'
+node {baseDir}/scripts/vagus-connect.js call calendar/create_event '{"title":"dayclub","startTimeMs":1771772400000,"endTimeMs":1771776000000,"allDay":false}'</code></pre>
+          <p class="note">
+            <code>io/set_subscription_resolution</code> controls cadence for all <code>vagus://io/type_*</code>
+            subscriptions and is gated by the device-side toggle <code>Allow agent to set resolution</code> (default off).
+            <code>infer/set_subscription_resolution</code> controls infer cadence and is gated by
+            <code>Allow agent to set infer resolution</code> (default off).
+          </p>
+        </section>
+
+        <section id="node-permissions" class="card">
+          <h2>User Permissions (Server-Side)</h2>
+          <p>
+            Permissions are enforced in the VAGUS Android app. The Node client can issue MCP reads and tool calls, but
+            execution is gated by user-configured capability toggles and runtime approval prompts.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Permission Layer</th>
+                <th>Owner</th>
+                <th>Node Client Impact</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Module/capability enablement</td><td>User in VAGUS app settings</td><td>Unavailable capabilities fail at read/call time.</td></tr>
+              <tr><td>Runtime approval prompts</td><td>User on device</td><td>Sensitive tool calls may be approved, denied, or timeout.</td></tr>
+              <tr><td>Agent identity context</td><td><code>agent/set_name</code> + app context</td><td>Shown in approval/governance context.</td></tr>
+            </tbody>
+          </table>
+          <p class="note">
+            Expected automation behavior: on permission denial/timeout, return a clear user action ("approve in VAGUS"
+            or "enable permission"), then retry once.
+          </p>
+        </section>
+
+        <section id="node-timeouts" class="card">
+          <h2>Timeouts and Liveness</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>MCP request timeout</td><td><code>22000ms</code></td></tr>
+              <tr><td>MCP initialize timeout</td><td><code>20000ms</code></td></tr>
+              <tr><td>WS heartbeat interval</td><td><code>30000ms</code></td></tr>
+              <tr><td>Pong timeout</td><td><code>10000ms</code></td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="node-errors" class="card">
+          <h2>Error Codes</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>NO_COMMAND</code></td><td>No subcommand passed.</td></tr>
+              <tr><td><code>NO_SESSION</code></td><td>No saved session file.</td></tr>
+              <tr><td><code>PAIR_FAILED</code></td><td>Pairing API failed.</td></tr>
+              <tr><td><code>SESSION_EXPIRED</code></td><td>Token rejected by relay.</td></tr>
+              <tr><td><code>CONNECT_FAILED</code></td><td>WSS connect/init failure.</td></tr>
+              <tr><td><code>BAD_JSON</code></td><td>Invalid tool arg JSON.</td></tr>
+              <tr><td><code>READ_FAILED</code></td><td>Resource read failed.</td></tr>
+              <tr><td><code>CALL_FAILED</code></td><td>Tool invocation failed or timed out.</td></tr>
+              <tr><td><code>FATAL</code></td><td>Unhandled client error.</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </section>
+    </main>
+
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
+
+

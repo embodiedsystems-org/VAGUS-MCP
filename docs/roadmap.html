@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VAGUS Docs - Roadmap</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+    <style>
+      .status-badge {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        padding: 0.2rem 0.6rem;
+        border-radius: 5px;
+        vertical-align: middle;
+        margin-right: 0.5rem;
+      }
+      .status-progress {
+        background: rgba(92, 218, 143, 0.12);
+        color: #5cda8f;
+        border: 1px solid rgba(92, 218, 143, 0.25);
+      }
+      .status-planned {
+        background: rgba(109, 179, 242, 0.12);
+        color: #6db3f2;
+        border: 1px solid rgba(109, 179, 242, 0.25);
+      }
+      .status-exploring {
+        background: rgba(166, 176, 191, 0.1);
+        color: var(--muted);
+        border: 1px solid rgba(166, 176, 191, 0.2);
+      }
+      .feature-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+      .feature-header h3 {
+        margin: 0;
+      }
+      .feature-why {
+        color: var(--ink);
+        margin: 0.4rem 0 0.7rem;
+      }
+      .feature-detail {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+      .feature-surface {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        background: #070d18;
+        border: 1px solid #263447;
+        border-radius: 6px;
+        padding: 0.15rem 0.55rem;
+        color: #d7e9ff;
+        margin-top: 0.6rem;
+      }
+      .phase-divider {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 1.5rem 0 0.5rem;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 0.95rem;
+      }
+      .phase-divider:first-of-type {
+        padding-top: 0;
+      }
+      .status-legend {
+        display: flex;
+        gap: 1.25rem;
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin: 0.3rem 0 0.5rem;
+      }
+    </style>
+  </head>
+  <body data-section="roadmap">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <div class="page-wrap">
+
+    <header class="site-header">
+      <div class="brand">
+        <p class="eyebrow">Developer Documentation</p>
+        <h1>VAGUS</h1>
+      </div>
+      <p class="subtitle">Product roadmap — what's stable, what's next, and what we're exploring.</p>
+    </header>
+
+    <nav class="top-nav" aria-label="Main sections">
+      <a class="nav-link" data-section-link="openclaw-deployment" href="./client.html">Openclaw Deployment</a>
+      <a class="nav-link" data-section-link="node-client" href="./node-client.html">Node Client</a>
+      <a class="nav-link" data-section-link="server" href="./server.html">Server (Android App)</a>
+      <a class="nav-link" data-section-link="relay" href="./relay.html">Self-Hosted Relay</a>
+      <a class="nav-link" data-section-link="roadmap" href="./roadmap.html">Roadmap</a>
+    </nav>
+
+    <main class="layout">
+      <aside class="side-nav" aria-label="Roadmap sections">
+        <p class="side-nav-title">Roadmap</p>
+        <a href="#n8n">Official n8n Integration</a>  
+        <a href="#agent-log">Agent Log Read</a>
+        <a href="#bluetooth">Bluetooth Pairing</a>
+        <a href="#ext-pipelines">External Pipelines</a>
+        <a href="#inference-gov">Inference Governance</a>
+        <a href="#multi-agent">Multi-Agent Support</a>
+        <a href="#sensor-export">Sensor API Export</a>
+        <a href="#sensor-ingest">External Sensor Ingestion</a>
+      </aside>
+
+      <div class="content">
+        <section class="card">
+          <h2>Roadmap</h2>
+          <p>What's stable now, what's coming next, and what we're exploring. Build on what's here — and know what's ahead.</p>
+          <div class="status-legend">
+            <span>🟢 In progress</span>
+            <span>🔵 Planned</span>
+            <span>⚪ Exploring</span>
+          </div>
+        </section>
+
+
+        <!-- ── Phase: Additional Integrations ── -->
+        <div class="phase-divider">More Integrations</div>
+
+        <section id="n8n" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-progress">IN PROGRESS</span>
+            <h3>Official n8n Integration</h3>
+          </div>
+          <p class="feature-why">
+            An official integration with n8n MCP client will be released shortly.          </p>
+
+        </section>
+
+
+        <!-- ── Phase: Self-awareness ── -->
+        <div class="phase-divider">The agent becomes self-aware</div>
+
+        <section id="agent-log" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-progress">IN PROGRESS</span>
+            <h3>Agent Log Read Tool</h3>
+          </div>
+          <p class="feature-why">
+            The agent gains the ability to read its own access logs — what it sensed, inferred, and did. Self-referential access enables agents that learn from their own embodied behavior and self-correct across sessions.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> Adds a <code>logs/read</code> tool returning structured log entries with timestamps, capability type (sensor/inference/tool), and payloads. Filterable by time range and capability. If you're building agents with memory or self-reflection, this is the primitive.
+          </p>
+          <span class="feature-surface">logs/read</span>
+        </section>
+
+        <!-- ── Phase: Expanding the body ── -->
+        <div class="phase-divider">Expanding the body</div>
+
+        <section id="bluetooth" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-planned">PLANNED</span>
+            <h3>Bluetooth Sensor Pairing</h3>
+          </div>
+          <p class="feature-why">
+            Extends the agent's sensory surface beyond the phone to any BLE-capable device — heart rate monitors, smart rings, smart glasses, environmental sensors. Each paired device adds new resources to the MCP capability set, discovered automatically through negotiation.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> New resources will appear under <code>vagus://bluetooth/*</code>, dynamically registered as devices pair. You don't need to know the device type in advance — your agent discovers capabilities the same way it discovers phone sensors today. Starting with heart rate and generic sensor profiles, expanding from there.
+          </p>
+          <span class="feature-surface">vagus://bluetooth/*</span>
+        </section>
+      <section id="ext-pipelines" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-planned">PLANNED</span>
+            <h3>External Inference Pipelines</h3>
+          </div>
+          <p class="feature-why">
+            The inference layer becomes pluggable. Today all inference is on-device heuristics — fast and private, but limited. External pipelines let the inference layer call cloud ML models, custom classifiers, or user-hosted services. The agent's understanding becomes extensible without changing the app.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> Inference resources keep the same MCP interface — your agent code doesn't change. What changes is the pipeline behind the resource: local heuristic, cloud API, or your own model. A pipeline spec and registration mechanism will be provided. If you're training custom models on physiological or environmental data, this is where they plug in.
+          </p>
+        </section>
+        <!-- ── Phase: Deeper governance ── -->
+        <div class="phase-divider">Deeper governance</div>
+
+        <section id="inference-gov" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-planned">PLANNED</span>
+            <h3>Granular Inference Governance</h3>
+          </div>
+          <p class="feature-why">
+            Individual inference channels already have on/off toggles. This extends the full governance stack — rate limits, time-of-day windows, approval prompts, and per-channel audit logs — to each inference resource. The same depth of control that exists for sensors and I/O tools, applied to the meaning layer.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> Each inference resource (<code>attention_availability</code>, <code>sleep_likelihood</code>, <code>indoor_confidence</code>, <code>notification_timing</code>) gets its own rate limit, time-of-day window, ask-each-time option, and audit stream. You'll be able to control not just <em>which</em> inferences the agent can make, but how often, when, and with full accountability.
+          </p>
+        </section>
+
+  
+
+        <!-- ── Phase: Multi-agent ── -->
+        <div class="phase-divider">Multiple agents, one body</div>
+
+        <section id="multi-agent" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-planned">PLANNED</span>
+            <h3>Multi-Agent Support</h3>
+          </div>
+          <p class="feature-why">
+            Right now VAGUS pairs with one agent at a time. Multi-agent support lets multiple agents connect to the same device simultaneously — each with its own identity, permissions, and governance scope. The phone becomes a shared body with individually governed tenants.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> The session and subscription architecture already tracks per-session IDs internally. This surfaces that as a first-class multi-agent capability: concurrent connections, per-agent governance profiles, per-agent audit logs, and priority/conflict resolution when two agents try to act on the same output channel. Agent identity via <code>agent/set_name</code> becomes critical — the user sees who's asking for what.
+          </p>
+        </section>
+
+        <!-- ── Phase: Opening the sensor layer ── -->
+        <div class="phase-divider">Exploring — opening the sensor layer</div>
+
+        <section id="sensor-export" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-exploring">EXPLORING</span>
+            <h3>Sensor API Export</h3>
+          </div>
+          <p class="feature-why">
+            Bridge phone sensors to callable Web Sensor APIs. External services — your own inference pipelines, logging dashboards, research tools — can subscribe to VAGUS sensor streams over standard web APIs, parallel to the MCP channel.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> Right now sensor data flows exclusively through MCP to the connected agent. This creates a parallel HTTP/WebSocket path for the same streams. If you're running your own inference models, logging sensor data for research, or building multi-consumer architectures, you'll be able to tap phone sensors directly without routing through the agent. The phone becomes a general-purpose sensor hub.
+          </p>
+        </section>
+
+        <section id="sensor-ingest" class="card">
+          <div class="feature-header">
+            <span class="status-badge status-exploring">EXPLORING</span>
+            <h3>External Web Sensor API Ingestion</h3>
+          </div>
+          <p class="feature-why">
+            Connect external web sensor APIs — weather services, air quality feeds, smart home platforms, health APIs — to MCP so agents can access them as standard VAGUS resources. The agent's sensory world expands beyond what's physically on the device.
+          </p>
+          <p class="feature-detail">
+            <strong>For builders:</strong> Register any REST or WebSocket data source as a VAGUS resource. A weather API becomes <code>vagus://external/weather</code>. A smart home hub becomes <code>vagus://external/home_temperature</code>. Your agent discovers and reads them the same way it reads the accelerometer — through MCP capability negotiation.
+          </p>
+          <span class="feature-surface">vagus://external/*</span>
+        </section>
+      </div>
+    </main>
+
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

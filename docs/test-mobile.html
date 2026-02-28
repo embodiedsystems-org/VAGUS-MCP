@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile Test</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #0e0b14; color: #e8e4f0; font-family: sans-serif; }
+
+.site-header { padding: 1rem; }
+.top-nav { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0 1rem; }
+.nav-link { flex: 1 1 0; min-width: 0; text-align: center; padding: 0.5rem; background: #161222; border: 1px solid #2a2440; border-radius: 6px; color: #9990ad; font-size: 0.8rem; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.layout { display: grid; grid-template-columns: 200px minmax(0,1fr); gap: 1rem; padding: 0 1rem; }
+.side-nav { background: #161222; padding: 1rem; border-radius: 8px; }
+.side-nav a { display: block; color: #9990ad; font-size: 0.85rem; padding: 0.2rem 0; text-decoration: none; }
+.content { min-width: 0; overflow: hidden; }
+.card { background: #161222; border: 1px solid #2a2440; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; overflow: hidden; }
+pre { background: #0a0714; border: 1px solid #2a2440; border-radius: 6px; padding: 0.7rem; font-size: 0.8rem; overflow-x: auto; margin: 0.5rem 0; color: #e8e4f0; font-family: monospace; }
+pre code { background: none; border: none; padding: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { padding: 0.4rem; border-bottom: 1px solid #2a2440; text-align: left; word-break: break-word; }
+code { font-size: 0.8rem; background: #1e1830; padding: 0.1rem 0.3rem; border-radius: 3px; border: 1px solid #2a2440; color: #c4a8ff; word-break: break-word; font-family: monospace; }
+
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; }
+  .side-nav { display: none; }
+}
+@media (max-width: 480px) {
+  .top-nav { flex-direction: column; }
+  .nav-link { flex: none; width: 100%; text-align: left; }
+}
+</style>
+</head>
+<body>
+<header class="site-header"><h1 style="color:#c4a8ff;font-family:monospace;letter-spacing:0.1em">VAGUS</h1></header>
+
+<nav class="top-nav">
+  <a class="nav-link" href="#">Openclaw Deployment</a>
+  <a class="nav-link" href="#">Node Client</a>
+  <a class="nav-link" href="#">Server (Android App)</a>
+  <a class="nav-link" href="#">Self-Hosted Relay</a>
+  <a class="nav-link" href="#">Roadmap</a>
+</nav>
+
+<main class="layout">
+  <aside class="side-nav">
+    <a href="#">Overview</a>
+    <a href="#">Setup</a>
+    <a href="#">CLI Commands</a>
+  </aside>
+  <section class="content">
+    <div class="card">
+      <h2>Pre block overflow test</h2>
+      <pre><code>node {baseDir}/scripts/vagus-connect.js call calendar/create_event '{"title":"Event Name","startTimeMs":1771772400000,"endTimeMs":1771776000000,"allDay":false}'</code></pre>
+    </div>
+    <div class="card">
+      <h2>Table test</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Args</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>pair</code></td><td><code>&lt;code&gt;</code></td><td>Pair and persist session token.</td></tr>
+          <tr><td><code>subscribe</code></td><td><code>&lt;uri&gt;</code></td><td>Long-running stream of updates.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Callout test</h2>
+      <div style="border-left:3px solid #a07ee0;background:rgba(196,168,255,0.08);padding:0.5rem 0.8rem;border-radius:0 6px 6px 0">
+        <p><strong>Transport:</strong> <code>wss://relay.withvagus.com/connect/&lt;session_token&gt;</code></p>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VAGUS Developer Docs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body data-section="home">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <div class="page-wrap">
+
+    <header class="site-header">
+      <div class="brand">
+        <p class="eyebrow">Developer Documentation</p>
+        <h1>VAGUS</h1>
+      </div>
+      <p class="subtitle">OpenClaw deployment, Node client, Android server, and self-hosted relay references.</p>
+    </header>
+
+    <main class="layout layout-single">
+      <section class="card">
+        <h2>Documentation Sections</h2>
+        <p>
+          This site is organized into four implementation-focused sections. Openclaw Deployment is user-flow-first.
+          Node Client is raw integration documentation for developers and custom agents.
+        </p>
+        <div class="section-grid">
+          <a class="card section-card" href="./client.html">
+            <h3>Openclaw Deployment</h3>
+            <p>Natural-language install, pairing, and user-facing operations in OpenClaw.</p>
+          </a>
+          <a class="card section-card" href="./node-client.html">
+            <h3>Node Client</h3>
+            <p>Raw CLI command surface, MCP contracts, and developer integration references.</p>
+          </a>
+          <a class="card section-card" href="./server.html">
+            <h3>Server (Android App)</h3>
+            <p>Planned: app architecture, modules, permission model, and MCP capability implementation.</p>
+          </a>
+          <a class="card section-card" href="./relay.html">
+            <h3>Self-Hosted Relay</h3>
+            <p>Full production guide for SSL + nginx + systemd deployment, verification, and operations.</p>
+          </a>
+          <a class="card section-card" href="./roadmap.html">
+            <h3>Roadmap</h3>
+            <p>What's coming next: Bluetooth pairing, inference governance, external pipelines, and more.</p>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+
