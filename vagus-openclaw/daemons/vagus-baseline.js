@@ -11,7 +11,9 @@
  */
 
 const { spawn } = require('child_process');
-const BASE_DIR = '/usr/local/lib/node_modules/openclaw/skills/vagus/scripts';
+const path = require('path');
+const os = require('os');
+const BASE_DIR = path.join(os.homedir(), '.openclaw', 'skills', 'vagus', 'scripts');
 const FOCUSED_DAEMON_PATH = '/data/.openclaw/workspace/vagus-focused.js';
 
 const RECONNECT_INITIAL_MS = 5000;
@@ -22,36 +24,48 @@ const subscriptions = [];
 let focusedProc = null;
 
 function startSubscription(uri, handler, opts = {}) {
-  let retryCount = 0;
-  let retryTimer = null;
-  let proc = null;
-  let lastDataTime = Date.now();
+  // State object for this subscription
+  const subObj = {
+    uri,
+    retryCount: 0,
+    retryTimer: null,
+    proc: null,
+    lastDataTime: Date.now(),
+    ignoreExit: false
+  };
 
   function cleanup() {
-    if (retryTimer) clearTimeout(retryTimer);
-    retryTimer = null;
+    if (subObj.retryTimer) clearTimeout(subObj.retryTimer);
+    subObj.retryTimer = null;
   }
 
-  function spawnSubscription() {
-    if (proc && !proc.killed) {
-      try { proc.kill('SIGTERM'); } catch (e) {}
+  function spawnSubscription(resetBackoff = false) {
+    if (resetBackoff) {
+      subObj.retryCount = 0;
+    }
+    if (subObj.proc && !subObj.proc.killed) {
+      try { subObj.proc.kill('SIGTERM'); } catch (e) {}
     }
 
-    proc = spawn('node', [BASE_DIR + '/vagus-connect.js', 'subscribe', uri], {
+    subObj.proc = spawn('node', [BASE_DIR + '/vagus-connect.js', 'subscribe', uri], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    proc.on('error', (err) => {
+    subObj.proc.on('error', (err) => {
       console.error(`[${uri}] Failed to start: ${err.message}`);
       scheduleReconnect();
     });
 
-    proc.on('exit', (code, signal) => {
+    subObj.proc.on('exit', (code, signal) => {
+      if (subObj.ignoreExit) {
+        subObj.ignoreExit = false;
+        return;
+      }
       console.log(`[${uri}] Subscription exited (code=${code}, signal=${signal})`);
       scheduleReconnect();
     });
 
-    proc.stdout.on('data', (data) => {
+    subObj.proc.stdout.on('data', (data) => {
       const lines = data.toString().split('\n');
       for (const line of lines) {
         if (!line.trim()) continue;
@@ -59,8 +73,8 @@ function startSubscription(uri, handler, opts = {}) {
         try { msg = JSON.parse(line); } catch (e) { continue; }
 
         if (msg.type === 'update' && msg.data) {
-          lastDataTime = Date.now();
-          retryCount = 0;
+          subObj.lastDataTime = Date.now();
+          subObj.retryCount = 0;
           cleanup();
           handler(msg.data, uri);
         } else if (msg.type === 'subscribed') {
@@ -71,37 +85,44 @@ function startSubscription(uri, handler, opts = {}) {
       }
     });
 
-    proc.stderr.on('data', () => {});
+    subObj.proc.stderr.on('data', () => {});
   }
 
   function scheduleReconnect() {
-    if (retryTimer) clearTimeout(retryTimer);
-    const delay = Math.min(RECONNECT_INITIAL_MS * Math.pow(2, retryCount), RECONNECT_MAX_MS);
-    retryCount++;
-    console.log(`[RECONNECT] ${uri} in ${delay}ms (attempt ${retryCount})`);
-    retryTimer = setTimeout(() => {
-      spawnSubscription();
+    cleanup();
+    const delay = Math.min(RECONNECT_INITIAL_MS * Math.pow(2, subObj.retryCount), RECONNECT_MAX_MS);
+    subObj.retryCount++;
+    console.log(`[RECONNECT] ${uri} in ${delay}ms (attempt ${subObj.retryCount})`);
+    subObj.retryTimer = setTimeout(() => {
+      spawnSubscription(false);
     }, delay);
   }
 
-  const subObj = {
-    uri,
-    lastDataTime: () => lastDataTime,
-    scheduleReconnect
+  subObj.forceReconnect = function() {
+    // Immediate restart, resetting backoff and suppressing exit reschedule
+    cleanup();
+    subObj.ignoreExit = true;
+    if (subObj.proc && !subObj.proc.killed) {
+      try { subObj.proc.kill('SIGTERM'); } catch (e) {}
+    }
+    subObj.retryCount = 0;
+    spawnSubscription(false);
   };
+
   subscriptions.push(subObj);
 
-  spawnSubscription();
-  return proc;
+  spawnSubscription(false);
+  return subObj;
 }
 
-// Global stale check
+// Global stale check: force immediate reconnect
 setInterval(() => {
   const now = Date.now();
   for (const sub of subscriptions) {
-    if (now - sub.lastDataTime() > STALE_TIMEOUT_MS) {
-      console.log(`[STALE] ${sub.uri} no data for ${now - sub.lastDataTime()}ms → reconnecting`);
-      sub.scheduleReconnect();
+    const stalledMs = now - sub.lastDataTime;
+    if (stalledMs > STALE_TIMEOUT_MS) {
+      console.log(`[STALE] ${sub.uri} no data for ${stalledMs}ms → forcing immediate reconnect`);
+      sub.forceReconnect();
     }
   }
 }, 30000);

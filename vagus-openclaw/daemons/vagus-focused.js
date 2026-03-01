@@ -10,9 +10,10 @@
  */
 
 const { spawn } = require('child_process');
-const BASE_DIR = '/usr/local/lib/node_modules/openclaw/skills/vagus/scripts';
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const BASE_DIR = path.join(os.homedir(), '.openclaw', 'skills', 'vagus', 'scripts');
 
 // Parse args
 const durationMs = parseInt(process.argv.find((_,i) => process.argv[i]==='--duration' && process.argv[i+1]) || '60000', 10) || 60000;

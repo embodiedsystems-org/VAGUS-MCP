@@ -7,14 +7,25 @@
  */
 
 const { spawn } = require('child_process');
-const BASE_DIR = '/usr/local/lib/node_modules/openclaw/skills/vagus/scripts';
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const BASE_DIR = path.join(os.homedir(), '.openclaw', 'skills', 'vagus', 'scripts');
 
 // Reconnection settings
 const RECONNECT_INITIAL_MS = 5000;
 const RECONNECT_MAX_MS = 300000;
-const STALE_TIMEOUT_MS = 90000;
+const STALE_TIMEOUT_MS = 90000; // Used by global stale check
+const FRESHNESS_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes: max age for data to be considered "fresh" for CSV writes
+
+// Critical raw I/O URIs that must be fresh before emitting a row
+const CRITICAL_URIS = [
+  'vagus://io/type_2',   // magnetometer
+  'vagus://io/type_5',   // light
+  'vagus://io/type_3',   // orientation
+  'vagus://io/type_65554', // color
+  'vagus://io/type_8'    // proximity
+];
 
 const subscriptions = [];
 
@@ -57,36 +68,48 @@ const buffs = {
 };
 
 function startSubscription(uri, handler) {
-  let retryCount = 0;
-  let retryTimer = null;
-  let proc = null;
-  let lastDataTime = Date.now();
+  // State object that we'll expose for control
+  const subObj = {
+    uri,
+    retryCount: 0,
+    retryTimer: null,
+    proc: null,
+    lastDataTime: Date.now(),
+    ignoreExit: false
+  };
 
   function cleanup() {
-    if (retryTimer) clearTimeout(retryTimer);
-    retryTimer = null;
+    if (subObj.retryTimer) clearTimeout(subObj.retryTimer);
+    subObj.retryTimer = null;
   }
 
-  function spawnSubscription() {
-    if (proc && !proc.killed) {
-      try { proc.kill('SIGTERM'); } catch (e) {}
+  function spawnSubscription(resetBackoff = false) {
+    if (resetBackoff) {
+      subObj.retryCount = 0;
+    }
+    if (subObj.proc && !subObj.proc.killed) {
+      try { subObj.proc.kill('SIGTERM'); } catch (e) {}
     }
 
-    proc = spawn('node', [BASE_DIR + '/vagus-connect.js', 'subscribe', uri], {
+    subObj.proc = spawn('node', [BASE_DIR + '/vagus-connect.js', 'subscribe', uri], {
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    proc.on('error', (err) => {
+    subObj.proc.on('error', (err) => {
       console.error(`[${uri}] Failed to start: ${err.message}`);
       scheduleReconnect();
     });
 
-    proc.on('exit', (code, signal) => {
+    subObj.proc.on('exit', (code, signal) => {
+      if (subObj.ignoreExit) {
+        subObj.ignoreExit = false;
+        return;
+      }
       console.log(`[${uri}] Subscription exited (code=${code}, signal=${signal})`);
       scheduleReconnect();
     });
 
-    proc.stdout.on('data', (data) => {
+    subObj.proc.stdout.on('data', (data) => {
       const lines = data.toString().split('\n');
       for (const line of lines) {
         if (!line.trim()) continue;
@@ -94,35 +117,41 @@ function startSubscription(uri, handler) {
         try { msg = JSON.parse(line); } catch (e) { continue; }
 
         if (msg.type === 'update' && msg.data) {
-          lastDataTime = Date.now();
-          retryCount = 0;
+          subObj.lastDataTime = Date.now();
+          subObj.retryCount = 0;
           cleanup();
           handler(msg.data);
         }
       }
     });
 
-    proc.stderr.on('data', () => {});
+    subObj.proc.stderr.on('data', () => {});
   }
 
   function scheduleReconnect() {
-    if (retryTimer) clearTimeout(retryTimer);
-    const delay = Math.min(RECONNECT_INITIAL_MS * Math.pow(2, retryCount), RECONNECT_MAX_MS);
-    retryCount++;
-    console.log(`[RECONNECT] ${uri} in ${delay}ms (attempt ${retryCount})`);
-    retryTimer = setTimeout(() => {
-      spawnSubscription();
+    cleanup();
+    const delay = Math.min(RECONNECT_INITIAL_MS * Math.pow(2, subObj.retryCount), RECONNECT_MAX_MS);
+    subObj.retryCount++;
+    console.log(`[RECONNECT] ${uri} in ${delay}ms (attempt ${subObj.retryCount})`);
+    subObj.retryTimer = setTimeout(() => {
+      spawnSubscription(false);
     }, delay);
   }
 
-  const subObj = {
-    uri,
-    lastDataTime: () => lastDataTime,
-    scheduleReconnect
+  subObj.forceReconnect = function() {
+    // Immediate restart, resetting backoff and suppressing exit handler rescheduling
+    cleanup();
+    subObj.ignoreExit = true;
+    if (subObj.proc && !subObj.proc.killed) {
+      try { subObj.proc.kill('SIGTERM'); } catch (e) {}
+    }
+    subObj.retryCount = 0;
+    spawnSubscription(false); // false: don't reset backoff again (already set)
   };
+
   subscriptions.push(subObj);
 
-  spawnSubscription();
+  spawnSubscription(false);
 }
 
 // Raw sensors
@@ -190,10 +219,33 @@ startSubscription('vagus://sensors/activity', (d) => {
 
 // CSV flush every 10 seconds (batch writes to reduce I/O)
 setInterval(() => {
-  const ts = Date.now();
-  // Use latest buffered raw values (may be up to a few seconds old)
+  const now = Date.now();
+
+  // Check freshness of critical raw I/O subscriptions
+  const staleCriticalURIs = subscriptions.filter(sub => {
+    if (!CRITICAL_URIS.includes(sub.uri)) return false;
+    return now - sub.lastDataTime > FRESHNESS_THRESHOLD_MS;
+  }).map(sub => sub.uri);
+
+  // Also check if any critical buffer is still null (no data ever received)
+  const missingBuffers = [];
+  if (!buffs.magnet) missingBuffers.push('magnet');
+  if (!buffs.light) missingBuffers.push('light');
+  if (!buffs.orient) missingBuffers.push('orient');
+  if (!buffs.color) missingBuffers.push('color');
+  if (!buffs.prox) missingBuffers.push('prox');
+
+  if (staleCriticalURIs.length > 0 || missingBuffers.length > 0) {
+    const reasons = [];
+    if (staleCriticalURIs.length) reasons.push(`stale (${staleCriticalURIs.join(', ')})`);
+    if (missingBuffers.length) reasons.push(`missing buffers (${missingBuffers.join(', ')})`);
+    console.warn(`[FLUSH SKIP] Incomplete data: ${reasons.join('; ')}`);
+    return;
+  }
+
+  // Use latest buffered raw values (may be up to a few seconds old, but we verified freshness above)
   const row = [
-    ts,
+    now,
     // magnet
     buffs.magnet?.x ?? '', buffs.magnet?.y ?? '', buffs.magnet?.z ?? '',
     // light
@@ -232,13 +284,14 @@ setInterval(() => {
   }
 }, 10000);
 
-// Global stale check
+// Global stale check: force immediate reconnect for any subscription that hasn't sent data recently
 setInterval(() => {
   const now = Date.now();
   for (const sub of subscriptions) {
-    if (now - sub.lastDataTime() > STALE_TIMEOUT_MS) {
-      console.log(`[STALE] ${sub.uri} no data for ${now - sub.lastDataTime()}ms → reconnecting`);
-      sub.scheduleReconnect();
+    const stalledMs = now - sub.lastDataTime;
+    if (stalledMs > STALE_TIMEOUT_MS) {
+      console.log(`[STALE] ${sub.uri} no data for ${stalledMs}ms → forcing immediate reconnect`);
+      sub.forceReconnect();
     }
   }
 }, 30000);
