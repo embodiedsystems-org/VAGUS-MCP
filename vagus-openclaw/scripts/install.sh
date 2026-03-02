@@ -10,23 +10,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "==> Installing VAGUS skill to ${INSTALL_DIR}"
 
-# Remove existing install (if any) to allow clean reinstall
 if [ -d "${INSTALL_DIR}" ]; then
   echo "    Existing install found, replacing..."
   rm -rf "${INSTALL_DIR}"
 fi
 
-# Copy skill files
 mkdir -p "$(dirname "${INSTALL_DIR}")"
 cp -r "${SCRIPT_DIR}/.." "${INSTALL_DIR}"
 
-# Install npm dependencies
 echo "==> Installing npm dependencies..."
 cd "${INSTALL_DIR}/scripts"
 npm install --silent
 
 echo ""
-echo "✅ VAGUS skill installed to ${INSTALL_DIR}"
+echo "VAGUS skill installed to ${INSTALL_DIR}"
 echo ""
 echo "Next steps:"
 echo "1. Pair your device:"
@@ -37,6 +34,10 @@ echo "   node ${INSTALL_DIR}/scripts/vagus-connect.js call agent/set_name '{\"na
 echo ""
 echo "3. Verify:"
 echo "   node ${INSTALL_DIR}/scripts/vagus-connect.js status"
+echo ""
+echo "4. Start the managed subscription service when you want persistent field streams:"
+echo "   node ${INSTALL_DIR}/scripts/vagus-manager.js"
+echo "   node ${INSTALL_DIR}/scripts/vagus-manager.js status"
 echo ""
 echo "For full docs, see ${INSTALL_DIR}/README.md"
 echo ""

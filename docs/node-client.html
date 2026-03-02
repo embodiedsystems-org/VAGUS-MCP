@@ -59,6 +59,7 @@
           </p>
           <div class="callout">
             <p><strong>Entry:</strong> <code>scripts/vagus-connect.js</code></p>
+            <p><strong>Manager:</strong> <code>scripts/vagus-manager.js</code></p>
             <p><strong>Session file:</strong> <code>~/.openclaw/vagus-session.json</code></p>
             <p><strong>Transport:</strong> <code>wss://relay.withvagus.com/connect/&lt;token&gt;</code></p>
             <p><strong>Related:</strong> <a href="./server.html">Server (Android App)</a> for MCP surface and governance, <a href="./relay.html">Self-Hosted Relay</a> for infrastructure setup.</p>
@@ -89,12 +90,16 @@ node vagus-connect.js status</code></pre>
               <tr><td><code>connect</code></td><td>none</td><td>Connect using saved session.</td></tr>
               <tr><td><code>status</code></td><td>none</td><td>Get connectivity and active modules.</td></tr>
               <tr><td><code>read</code></td><td><code>&lt;uri&gt;</code></td><td>One-shot resource read.</td></tr>
-              <tr><td><code>subscribe</code></td><td><code>&lt;uri&gt;</code></td><td>Long-running stream of updates.</td></tr>
+              <tr><td><code>subscribe</code></td><td><code>&lt;uri&gt;</code></td><td>Long-running JSONL stream with <code>lifecycle</code>, <code>stream_state</code>, and <code>update</code> events.</td></tr>
               <tr><td><code>unsubscribe</code></td><td><code>&lt;uri&gt;</code></td><td>Stop a resource subscription.</td></tr>
               <tr><td><code>call</code></td><td><code>&lt;tool&gt; '&lt;json&gt;'</code></td><td>Invoke a tool call.</td></tr>
               <tr><td><code>list-resources</code></td><td>none</td><td>List available resource URIs.</td></tr>
               <tr><td><code>list-tools</code></td><td>none</td><td>List available tools + schemas.</td></tr>
               <tr><td><code>disconnect</code></td><td>none</td><td>Delete local session file.</td></tr>
+              <tr><td><code>vagus-manager.js add</code></td><td><code>&lt;uri&gt;</code></td><td>Add a URI to the managed persistent subscription set.</td></tr>
+              <tr><td><code>vagus-manager.js remove</code></td><td><code>&lt;uri&gt;</code></td><td>Remove a URI from the managed persistent subscription set.</td></tr>
+              <tr><td><code>vagus-manager.js list</code></td><td>none</td><td>List active managed subscriptions.</td></tr>
+              <tr><td><code>vagus-manager.js status</code></td><td>none</td><td>Read managed stream freshness state and lifecycle status.</td></tr>
             </tbody>
           </table>
         </section>
@@ -105,6 +110,7 @@ node vagus-connect.js status</code></pre>
           <pre><code class="language-json">{"type":"paired","session_token":"..."}
 {"type":"capabilities","resources":["..."],"tools":["..."]}
 {"type":"resource","uri":"vagus://device/screen","data":{"screen_on":true,"locked":false}}
+{"type":"stream_state","uri":"vagus://device/screen","status":"fresh","freshness_ms":132,"thresholds":{"observed_p95_interval_ms":1000,"delayed_after_ms":2500,"stale_after_ms":6000,"unavailable_after_ms":20000}}
 {"type":"result","tool":"notify","success":true,"data":{"content":[{"type":"text","text":"{\"ok\":true}"}]}}</code></pre>
         </section>
 
@@ -136,6 +142,24 @@ node vagus-connect.js status</code></pre>
           <p class="note">
             The <code>vagus-connect.js</code> wrapper emits normalized JSONL and preserves MCP correlation context (including <code>trace_id</code>) in the <code>mcp</code> object for operational commands (read/call/list/subscribe/unsubscribe and streamed updates).
             If you need the full raw JSON-RPC envelope, capture raw MCP frames in custom integrations.
+          </p>
+        </section>
+
+        <section id="node-manager" class="card">
+          <h2>Managed Streaming</h2>
+          <p>
+            For persistent field operation, prefer <code>vagus-manager.js</code> over multiple independent subscribe
+            processes. The manager keeps one MCP session alive, auto-reconnects, re-subscribes active URIs, and tracks
+            adaptive freshness per stream.
+          </p>
+          <pre><code class="language-bash">node {baseDir}/scripts/vagus-manager.js
+node {baseDir}/scripts/vagus-manager.js add vagus://sensors/location
+node {baseDir}/scripts/vagus-manager.js remove vagus://inference/attention
+node {baseDir}/scripts/vagus-manager.js list
+node {baseDir}/scripts/vagus-manager.js status</code></pre>
+          <p class="note">
+            Stale detection is dynamic: thresholds are learned from observed inter-arrival timing only. The manager
+            does not assume a hard-coded cadence per resource.
           </p>
         </section>
 

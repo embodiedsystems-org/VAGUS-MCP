@@ -23,6 +23,8 @@ const { WsTransport } = require('./lib/ws-transport');
 const { McpSession } = require('./lib/mcp-session');
 const { SessionStore } = require('./lib/session-store');
 const { SubscriptionManager } = require('./lib/subscription-manager');
+const { ManagedSubscriptionSession } = require('./lib/managed-subscription-session');
+const { AdaptiveFreshness } = require('./lib/adaptive-freshness');
 
 const DEFAULT_RELAY = process.env.VAGUS_RELAY_URL || 'wss://relay.withvagus.com';
 const DEFAULT_PAIR_ENDPOINT = process.env.VAGUS_PAIR_ENDPOINT || 'https://relay.withvagus.com/pair';
@@ -211,10 +213,33 @@ async function cmdSubscribe(uri, store) {
   const saved = store.load();
   if (!saved) emitError('NO_SESSION', 'No saved session. Run pair first.');
 
-  const { session, transport } = await connectAndInitialize(saved.session_token);
+  const managed = new ManagedSubscriptionSession({
+    sessionToken: saved.session_token,
+    relayUrl: saved.relay_url || DEFAULT_RELAY,
+  });
+  const freshness = new AdaptiveFreshness();
+  let lastStatus = null;
+  let freshnessTimer = null;
 
-  // Set up update handler BEFORE subscribing
-  session.onSessionReconnect((payload) => {
+  const emitFreshness = (force = false) => {
+    const snapshot = freshness.getStatus();
+    if (!force && snapshot.status === lastStatus) {
+      return;
+    }
+    lastStatus = snapshot.status;
+    emit({
+      type: 'stream_state',
+      uri,
+      status: snapshot.status,
+      freshness_ms: snapshot.freshness_ms,
+      last_received_at: snapshot.last_received_at,
+      last_source_ts: snapshot.last_source_ts,
+      thresholds: snapshot.thresholds,
+    });
+  };
+
+  managed.onSessionReconnect((payload) => {
+    freshness.startGrace();
     emit({
       type: 'session_reconnect',
       sessionId: payload?.sessionId,
@@ -224,22 +249,48 @@ async function cmdSubscribe(uri, store) {
       ts: payload?.ts,
       trace_id: payload?.trace_id || null,
     });
+    emitFreshness(true);
   });
 
-  session.onResourceUpdate((updateUri, data, mcpMeta) => {
-    if (updateUri === uri) {
-      emit({ type: 'update', uri: updateUri, data, mcp: mcpMeta || session.getLastNotificationMeta() });
+  managed.onLifecycle((event) => {
+    if (event.type === 'transport_closed') {
+      freshness.startGrace();
+      emitFreshness(true);
     }
+    emit({ type: 'lifecycle', uri, event });
   });
 
-  await session.subscribe(uri);
-  emit({ type: 'subscribed', uri, mcp: session.getLastResponseMeta() });
+  managed.onUpdate((updateUri, data, mcpMeta) => {
+    if (updateUri !== uri) {
+      return;
+    }
+    const receivedAt = Date.now();
+    const sourceTs = typeof data?.ts === 'number' ? data.ts : null;
+    freshness.observe(sourceTs, receivedAt);
+    emit({
+      type: 'update',
+      uri: updateUri,
+      data,
+      freshness: freshness.getStatus(receivedAt),
+      mcp: mcpMeta,
+    });
+    emitFreshness(true);
+  });
 
-  // Keep process alive - stream updates until killed
-  // Handle SIGINT/SIGTERM gracefully
+  await managed.subscribe(uri);
+  await managed.start();
+  emitFreshness(true);
+
+  freshnessTimer = setInterval(() => {
+    emitFreshness(false);
+  }, 1000);
+
   const cleanup = async () => {
-    try { await session.unsubscribe(uri); } catch (_) {}
-    transport.close();
+    if (freshnessTimer) {
+      clearInterval(freshnessTimer);
+      freshnessTimer = null;
+    }
+    await managed.close();
     process.exit(0);
   };
   process.on('SIGINT', cleanup);

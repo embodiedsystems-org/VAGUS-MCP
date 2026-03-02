@@ -66,7 +66,8 @@
             <p><strong>User interface:</strong> natural-language prompts in OpenClaw</p>
             <p><strong>Agent execution:</strong> command + MCP orchestration under the hood</p>
             <p><strong>CLI Entry:</strong> <code>scripts/vagus-connect.js</code></p>
-            <p><strong>Daemon guide:</strong> <code>../vagus-openclaw/DAEMON_GUIDE.md</code> (baseline + focused daemon patterns for long-running sensing workflows)</p>
+            <p><strong>Managed streaming entry:</strong> <code>scripts/vagus-manager.js</code></p>
+            <p><strong>Long-lived model:</strong> one managed MCP session with runtime add/remove/list/status control</p>
             <p><strong>Session Store:</strong> <code>~/.openclaw/vagus-session.json</code></p>
             <p><strong>Pair Endpoint:</strong> <code>https://relay.withvagus.com/pair</code></p>
             <p><strong>WebSocket Relay:</strong> <code>wss://relay.withvagus.com/connect/&lt;session_token&gt;</code></p>
@@ -189,6 +190,21 @@ Agent: Sent successfully.</code></pre>
                 <td>Ping every 30s; terminate on missing pong after 10s.</td>
               </tr>
               <tr>
+                <td><code>scripts/vagus-manager.js</code></td>
+                <td>Persistent subscription owner.</td>
+                <td>One-session manager with singleton protection, runtime control, and freshness state.</td>
+              </tr>
+              <tr>
+                <td><code>lib/managed-subscription-session.js</code></td>
+                <td>Reconnect + resubscribe coordinator.</td>
+                <td>Re-establishes transport, re-runs MCP initialize, and re-subscribes active URIs.</td>
+              </tr>
+              <tr>
+                <td><code>lib/adaptive-freshness.js</code></td>
+                <td>Dynamic stream health model.</td>
+                <td>Learns stale thresholds from observed inter-arrival timing with no per-resource hard-coded cadence.</td>
+              </tr>
+              <tr>
                 <td><code>lib/session-store.js</code></td>
                 <td>Persist and load token metadata.</td>
                 <td>Reads/writes JSON to <code>~/.openclaw/vagus-session.json</code>.</td>
@@ -255,12 +271,16 @@ Agent: Sent successfully.</code></pre>
               <tr><td><code>connect</code></td><td>none</td><td><code>connected</code> then <code>capabilities</code></td></tr>
               <tr><td><code>status</code></td><td>none</td><td><code>status</code> object</td></tr>
               <tr><td><code>read</code></td><td><code>&lt;uri&gt;</code></td><td><code>resource</code> object</td></tr>
-              <tr><td><code>subscribe</code></td><td><code>&lt;uri&gt;</code></td><td><code>subscribed</code>, then <code>update</code> stream</td></tr>
+              <tr><td><code>subscribe</code></td><td><code>&lt;uri&gt;</code></td><td><code>lifecycle</code>/<code>stream_state</code>/<code>update</code> stream</td></tr>
               <tr><td><code>unsubscribe</code></td><td><code>&lt;uri&gt;</code></td><td><code>unsubscribed</code></td></tr>
               <tr><td><code>call</code></td><td><code>&lt;tool&gt; '&lt;json&gt;'</code></td><td><code>result</code> object</td></tr>
               <tr><td><code>list-resources</code></td><td>none</td><td><code>resources</code> array</td></tr>
               <tr><td><code>list-tools</code></td><td>none</td><td><code>tools</code> array</td></tr>
               <tr><td><code>disconnect</code></td><td>none</td><td><code>disconnected</code> and deletes local session file</td></tr>
+              <tr><td><code>vagus-manager.js add</code></td><td><code>&lt;uri&gt;</code></td><td>Add URI to managed long-lived set</td></tr>
+              <tr><td><code>vagus-manager.js remove</code></td><td><code>&lt;uri&gt;</code></td><td>Remove URI from managed long-lived set</td></tr>
+              <tr><td><code>vagus-manager.js list</code></td><td>none</td><td>List active managed subscriptions</td></tr>
+              <tr><td><code>vagus-manager.js status</code></td><td>none</td><td>Managed stream freshness and lifecycle status</td></tr>
             </tbody>
           </table>
         </section>
@@ -268,21 +288,25 @@ Agent: Sent successfully.</code></pre>
         <section id="client-streaming" class="card">
           <h2>Streaming Model</h2>
           <p>
-            Subscriptions are long-running agent-managed processes. OpenClaw should keep each subscription process
-            alive, parse JSONL updates, and stop streams only when user intent changes.
+            Persistent streaming should be managed through one long-lived manager session. Direct
+            <code>subscribe</code> remains useful for ad hoc single-stream workflows, but it is no longer the preferred
+            pattern for multiple concurrent long-lived streams.
           </p>
           <pre><code class="language-bash">node {baseDir}/scripts/vagus-connect.js subscribe vagus://device/screen</code></pre>
-          <pre><code class="language-json">{"type":"subscribed","uri":"vagus://device/screen"}
-{"type":"update","uri":"vagus://device/screen","data":{"screen_on":true,"locked":false,"last_event":"init","ts":1772036194947}}</code></pre>
+          <pre><code class="language-json">{"type":"lifecycle","uri":"vagus://device/screen","event":{"type":"connected","subscriptions":["vagus://device/screen"]}}
+{"type":"stream_state","uri":"vagus://device/screen","status":"warming","freshness_ms":null,"thresholds":null}
+{"type":"update","uri":"vagus://device/screen","data":{"screen_on":true,"locked":false,"last_event":"init","ts":1772036194947},"freshness":{"status":"fresh"}}</code></pre>
           <p>
-            On reconnect, server may emit <code>session_reconnect</code> and replay buffered updates before resuming live events.
-            Raw MCP notification envelopes also include <code>metadata.requestId</code>.
+            On reconnect, the client emits <code>session_reconnect</code>, transitions streams through
+            <code>grace</code>/<code>warming</code> as needed, then resumes <code>update</code> delivery once fresh data arrives.
           </p>
           <p class="note">
             User-facing phrasing should remain natural: for example, "I am now tracking your screen and location state."
-            OpenClaw JSONL output is normalized and includes MCP correlation metadata under <code>mcp</code> for
-            operational commands and streamed updates. Capture raw MCP frames only if you need full envelopes.
+            Freshness should be inferred from <code>stream_state</code> and recent <code>update</code> timing, not from log file activity.
           </p>
+          <pre><code class="language-bash">node {baseDir}/scripts/vagus-manager.js
+node {baseDir}/scripts/vagus-manager.js add vagus://sensors/location
+node {baseDir}/scripts/vagus-manager.js status</code></pre>
         </section>
 
         <section id="client-resources" class="card">
@@ -463,7 +487,8 @@ node {baseDir}/scripts/vagus-connect.js status</code></pre>
           <h3>Connectivity Probe</h3>
           <pre><code class="language-bash">node {baseDir}/scripts/vagus-connect.js status
 node {baseDir}/scripts/vagus-connect.js read vagus://session/info
-node {baseDir}/scripts/vagus-connect.js list-tools</code></pre>
+node {baseDir}/scripts/vagus-connect.js list-tools
+node {baseDir}/scripts/vagus-manager.js status</code></pre>
 
           <h3>Permission Probe</h3>
           <pre><code class="language-bash">node {baseDir}/scripts/vagus-connect.js call notify '{"title":"Permission Check","body":"Testing notify permission"}'
