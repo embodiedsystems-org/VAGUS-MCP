@@ -10,7 +10,7 @@
 - OpenClaw skill package and CLI (`scripts/vagus-connect.js`) for pairing, MCP initialization, resource reads, subscriptions, and tool calls.
 - Stores client session state in `~/.openclaw/vagus-session.json`.
 - Replaced for primary OpenClaw runtime integration by native plugins in:
-  `https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw`
+  [Somatic Memory for OpenClaw](https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw)
 
 3. `docs`
 - Static HTML/CSS/JS documentation site for deployment and integration guidance.
@@ -38,4 +38,4 @@
 - Redis is optional by default and recommended for production continuity.
 - See [relay-server/README.md](./relay-server/README.md) for deployment controls.
 - For OpenClaw runtime integration, use the plugin-first path in:
-  `https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw`
+  [Somatic Memory for OpenClaw](https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw)
