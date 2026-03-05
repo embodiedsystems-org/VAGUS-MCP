@@ -2,6 +2,13 @@
 
 Give your OpenClaw agent a phone.
 
+> [!WARNING]
+> `vagus-openclaw` is deprecated and retained only as a legacy compatibility path.
+> Use the plugin-first integration at the Somatic Memory repository root:
+> [https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw](https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw)
+>
+> See deprecation details in [DEPRECATED.md](./DEPRECATED.md).
+
 ## Install
 
 Install the skill to your user OpenClaw skills directory so it survives updates. Do not place it in the system skills directory.

@@ -14,7 +14,7 @@ Monorepo for the VAGUS MCP stack:
 ├── docs/
 ├── releases/
 ├── relay-server/
-├── vagus-openclaw/
+├── vagus-openclaw/ (deprecated)
 ├── ROADMAP.md
 ├── ARCHITECTURE.md
 └── SECURITY.md

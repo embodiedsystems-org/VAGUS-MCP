@@ -3,7 +3,7 @@
 ## Supported Components
 
 - `relay-server`
-- `vagus-openclaw`
+- `vagus-openclaw` (legacy/deprecated compatibility path)
 - `docs` (documentation-only surface)
 
 ## Reporting a Vulnerability

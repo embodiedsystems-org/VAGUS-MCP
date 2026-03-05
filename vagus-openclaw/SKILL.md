@@ -6,6 +6,11 @@ metadata: {"openclaw":{"requires":{"bins":["node"]},"emoji":"phone","homepage":"
 
 # VAGUS - Phone MCP Connection
 
+> [!WARNING]
+> This skill is deprecated as the primary OpenClaw integration path.
+> Prefer the plugin-first stack at:
+> [https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw](https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw)
+
 VAGUS gives you access to the user's Android phone through MCP. The primary command surface is `{baseDir}/scripts/vagus-connect.js`. For long-lived field operation and persistent subscriptions, use `{baseDir}/scripts/vagus-manager.js`.
 
 Install location note: the skill must live in `~/.openclaw/skills/vagus`. Do not rely on a system-wide install path.
