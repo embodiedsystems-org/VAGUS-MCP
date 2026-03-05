@@ -2,7 +2,7 @@
 
 Monorepo for the VAGUS MCP stack:
 - `relay-server/`: WebSocket pairing and transport relay
-- `vagus-openclaw/`: OpenClaw skill and Node CLI client
+- `vagus-openclaw/`: Legacy OpenClaw skill and Node CLI client (deprecated)
 - `docs/`: static developer documentation site
 - `releases/`: distributable Android build artifacts (including RC APKs)
 - `ROADMAP.md`: product and platform roadmap
@@ -32,12 +32,19 @@ npm start
 
 ### 2) Run the OpenClaw client locally
 
+Legacy path (deprecated):
+
 ```bash
 cd vagus-openclaw/scripts
 npm install
 node vagus-connect.js pair <PAIR_CODE>
 node vagus-connect.js status
 ```
+
+Recommended path (plugin-first):
+
+- Use Somatic Memory native OpenClaw plugins from the repository root:
+  `https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw`
 
 ### 3) Open static docs
 
@@ -46,7 +53,8 @@ Open [docs/index.html](./docs/index.html) in a browser, or serve `docs/` with an
 ## Deployment
 
 - Relay production docs: [relay-server/README.md](./relay-server/README.md)
-- OpenClaw skill docs: [vagus-openclaw/README.md](./vagus-openclaw/README.md)
+- Legacy OpenClaw skill docs (deprecated): [vagus-openclaw/README.md](./vagus-openclaw/README.md)
+- Plugin-first OpenClaw integration: `https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw`
 - Upload prep: [PUBLISHING_CHECKLIST.md](./PUBLISHING_CHECKLIST.md)
 
 ## Releases

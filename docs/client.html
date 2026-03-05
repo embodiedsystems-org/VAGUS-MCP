@@ -63,6 +63,11 @@
             app, and runs MCP operations autonomously.
           </p>
           <div class="callout">
+            <p><strong>Deprecation status:</strong> This page documents the legacy <code>vagus-openclaw</code> path.</p>
+            <p><strong>Recommended integration:</strong> plugin-first OpenClaw integration from
+              <code>https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw</code></p>
+          </div>
+          <div class="callout">
             <p><strong>User interface:</strong> natural-language prompts in OpenClaw</p>
             <p><strong>Agent execution:</strong> command + MCP orchestration under the hood</p>
             <p><strong>CLI Entry:</strong> <code>scripts/vagus-connect.js</code></p>
@@ -100,8 +105,8 @@
             </thead>
             <tbody>
               <tr>
-                <td><code>Install VAGUS from https://github.com/vagus-mcp/openclaw-skill</code></td>
-                <td>Install skill package, run dependency install, prompt for pairing code.</td>
+                <td><code>Install Somatic Memory OpenClaw plugins from https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw</code></td>
+                <td>Use plugin-first installation flow from the Somatic Memory repository root.</td>
               </tr>
               <tr>
                 <td><code>Pair using code 584821</code></td>
@@ -133,8 +138,8 @@
         <section id="client-journeys" class="card">
           <h2>User Journey</h2>
           <h3>1. Install and Pair</h3>
-          <pre><code class="language-text">User: Install VAGUS from https://github.com/vagus-mcp/openclaw-skill
-Agent: I installed the skill. Open the VAGUS app and share your pairing code.
+          <pre><code class="language-text">User: Install Somatic Memory OpenClaw plugins from https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw
+Agent: I installed the plugin stack. Open the VAGUS app and share your pairing code.
 User: 584821
 Agent: Paired successfully. I can now access phone resources and tools.</code></pre>
 
