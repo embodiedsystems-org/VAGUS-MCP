@@ -44,7 +44,7 @@ node vagus-connect.js status
 Recommended path (plugin-first):
 
 - Use Somatic Memory native OpenClaw plugins from the repository root:
-  `https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw`
+  [Somatic Memory for OpenClaw](https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw)
 
 ### 3) Open static docs
 
@@ -54,7 +54,7 @@ Open [docs/index.html](./docs/index.html) in a browser, or serve `docs/` with an
 
 - Relay production docs: [relay-server/README.md](./relay-server/README.md)
 - Legacy OpenClaw skill docs (deprecated): [vagus-openclaw/README.md](./vagus-openclaw/README.md)
-- Plugin-first OpenClaw integration: `https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw`
+- Plugin-first OpenClaw integration: [Somatic Memory for OpenClaw](https://github.com/embodiedsystems-org/Somatic-Memory-for-Openclaw)
 - Upload prep: [PUBLISHING_CHECKLIST.md](./PUBLISHING_CHECKLIST.md)
 
 ## Releases
